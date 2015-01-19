@@ -83,28 +83,20 @@ OptionParser.new do |opts|
   end
 end.parse!
 
-# Get the command line parameters and assign it to variables
-hostname   = options[:hostname]
-username   = options[:username]
-period     = options[:period]
-mode       = options[:mode]
-warning    = options[:warning]
-critical   = options[:critical]
-
 # Verifies the given parameters
-if hostname == nil?
+if options[:hostname] == nil?
   puts 'The hostname is a neccessary parameter.'
   exit 3
-elsif username == nil?
+elsif options[:username] == nil?
   puts 'The username is a neccessary parameter.'
   exit 3
 end
 
 # Get information about the cpu usage
 begin
-  connection = Net::SSH.start(hostname, username)
+  connection = Net::SSH.start(options[:hostname], options[:username])
   cpu_info_1 = connection.exec!("cat /proc/stat | grep -i '^cpu  '").split
-  sleep(period)
+  sleep(options[:period])
   cpu_info_2 = connection.exec!("cat /proc/stat | grep -i '^cpu  '").split
 rescue
   print "CPU UNKNOWN - #{$ERROR_INFO}\n"
@@ -119,26 +111,26 @@ cpu_idle   = cpu_info_2.at(4).to_i - cpu_info_1.at(4).to_i
 cpu_time   = cpu_user + cpu_nice + cpu_system + cpu_idle
 
 # Generate performance data output regarding the selected monitoring mode.
-case mode
+case options[:mode]
 when 0
   # Total CPU utilization
   perf_total = (100.to_f / cpu_time.to_f) * (cpu_user + cpu_nice + cpu_system)
-  errorcode = generate_error_code(perf_total, warning, critical)
+  errorcode = generate_error_code(perf_total, options[:warning], options[:critical])
   print_perf_data('Total', perf_total, errorcode)
 when 1
   # CPU utilization of user processes
   perf_user   = (100.to_f / cpu_time.to_f) * cpu_user.to_f
-  errorcode = generate_error_code(perf_user, warning, critical)
+  errorcode = generate_error_code(perf_user, options[:warning], options[:critical])
   print_perf_data('User', perf_user, errorcode)
 when 2
   # CPU utilization of nice processes
   perf_nice   = (100.to_f / cpu_time.to_f) * cpu_nice.to_f
-  errorcode = generate_error_code(perf_nice, warning, critical)
+  errorcode = generate_error_code(perf_nice, options[:warning], options[:critical])
   print_perf_data('Nice', perf_nice, errorcode)
 when 3
   # CPU utilization of system processes
   perf_system = (100.to_f / cpu_time.to_f) * cpu_system.to_f
-  errorcode = generate_error_code(perf_system, warning, critical)
+  errorcode = generate_error_code(perf_system, options[:warning], options[:critical])
   print_perf_data('System', perf_system, errorcode)
 end
 
