@@ -2,8 +2,8 @@
 #
 # @file         check_disk_by_ssh.rb
 # @author       Wollmann, Tobias <t.wollmann@bull.de>
-# @date         18/08/2014
-# @version      0.3
+# @date         01/19/2014
+# @version      0.4
 #
 
 require 'net/ssh'
@@ -53,8 +53,11 @@ elsif filesystem == nil
 end
 
 # Get filesystem information of the remote host
-fs_info = Net::SSH.start(hostname, username) do |ssh|
-  ssh.exec!("stat -f -c '%s %b %f %c %d' " + filesystem).split
+begin
+  fs_info = Net::SSH.start(hostname, username).exec!("stat -f -c '%s %b %f %c %d' " + filesystem).split
+rescue
+  print "DISK UNKNOWN - #{$!}\n"
+  exit 3
 end
 
 # Get the filesystem information and store it to variables
