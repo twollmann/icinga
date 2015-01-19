@@ -13,9 +13,21 @@ require 'optparse'
 # Main
 #
 
+usage = {
+  hostname: 'Hostname or ip address of the remote host.'
+}
+
 # Initialize command line parameter hash and set defaults
-options = {:hostname=>nil, :username=>nil, :filesystem=>nil, :warning=>90, :critical=>95}
-optparse = OptionParser.new do |opts|
+options = {
+  hostname:   nil,
+  username:   nil,
+  filesystem: nil,
+  warning:    90,
+  critical:   95
+}
+
+# Parse command line parameters
+OptionParser.new do |opts|
   opts.banner = "Nagios plugin to gather filesystem information of a remote host."
   opts.on("-H", "--hostname hostname", "Hostname or IP-address of the remote system.") do |host|
     options[:hostname] = host
@@ -114,16 +126,16 @@ print "\| "
 # Performance data output: "'Space /'=9.99GB;90;95;'Inodes /'=120000;90;95
 # Performance data diskspace
 print "'Space #{filesystem}'="
-print p_curr.round(2).to_s + "MB;"
-print p_warn.round(0).to_s + ";"
-print p_crit.round(0).to_s + ";"
-print p_min.round(0).to_s + ";"
-print p_max.round(0).to_s + ";"
+print p_curr.round(2).to_s + 'MB;'
+print p_warn.round(0).to_s + ';'
+print p_crit.round(0).to_s + ';'
+print p_min.round(0).to_s + ';'
+print p_max.round(0).to_s + ';'
 # Performance data inodes
 print "'Inodes #{filesystem}'="
-print i_curr.round(0).to_s + ";"
-print i_warn.round(0).to_s + ";"
-print i_crit.round(0).to_s + ";"
-print i_min.round(0).to_s + ";"
+print i_curr.round(0).to_s + ';'
+print i_warn.round(0).to_s + ';'
+print i_crit.round(0).to_s + ';'
+print i_min.round(0).to_s + ';'
 print i_max.round(0).to_s + ";\n"
 exit errorcode
