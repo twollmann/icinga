@@ -2,8 +2,8 @@
 #
 # @file         check_cpu_by_ssh.rb
 # @author       Wollmann, Tobias <t.wollmann@bull.de>
-# @date         05/11/2014
-# @version      0.1
+# @date         01/19/2014
+# @version      0.2
 #
 
 require 'net/ssh'
@@ -22,6 +22,9 @@ optparse = OptionParser.new do |opts|
   end
   opts.on("-u", "--username username", "Username of the monitoring account on the Server.") do |user|
     options[:username] = user
+  end
+  opts.on("-d", "--delay delay", "Delay betwen two checks.") do |delay|
+    options[:delay] =  delay
   end
   opts.on("-w", "--warning warning", "Warning threshold.") do |warn|
     options[:warning] =  warn
@@ -43,6 +46,8 @@ if hostname == nil
 elsif username == nil
   puts "The username is a neccessary parameter."
   exit 3
+elsif delay == nil
+  delay = 2
 end
 
 # Get information about the cpu usage
@@ -50,7 +55,7 @@ cpu_info_1 = Net::SSH.start(hostname, username) do |ssh|
   ssh.exec!("cat /proc/stat | grep -i '^cpu  '").split
 end
 
-sleep 5
+sleep(delay.sec)
 
 cpu_info_2 = Net::SSH.start(hostname, username) do |ssh|
   ssh.exec!("cat /proc/stat | grep -i '^cpu  '").split
@@ -67,6 +72,9 @@ cpu_nice   = cpu_info_2.at(2).to_i - cpu_info_1.at(2).to_i
 cpu_system = cpu_info_2.at(3).to_i - cpu_info_1.at(3).to_i
 cpu_idle   = cpu_info_2.at(4).to_i - cpu_info_1.at(4).to_i
 
+cpu_total  = cpu_user + cpu_nice + cpu_system + cpu_idle
+
+puts cpu_total.to_s
 
 puts cpu_user.to_s
 puts cpu_nice.to_s
