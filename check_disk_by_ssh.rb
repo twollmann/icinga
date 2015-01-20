@@ -14,7 +14,11 @@ require 'optparse'
 #
 
 usage = {
-  hostname: 'Hostname or ip address of the remote host.'
+  hostname:   'Hostname or ip address of the remote host.',
+  username:   'Username of the monitoring user on the remote host.',
+  filesystem: 'Specifies the filesystem.',
+  warning:    'Specifies the warning threshold.',
+  critical:   'Specifies the critical threshold.'
 }
 
 # Initialize command line parameter hash and set defaults
@@ -28,20 +32,20 @@ options = {
 
 # Parse command line parameters
 OptionParser.new do |opts|
-  opts.banner = "Nagios plugin to gather filesystem information of a remote host."
-  opts.on("-H", "--hostname hostname", "Hostname or IP-address of the remote system.") do |host|
+  opts.banner = 'Nagios plugin to get filesystem information of a remote host.'
+  opts.on('-H', '--hostname hostname', usage[:hostname]) do |host|
     options[:hostname] = host
   end
-  opts.on("-u", "--username username", "Username of the monitoring account on the Server.") do |user|
+  opts.on('-u', '--username username', usage[:username]) do |user|
     options[:username] = user
   end
-  opts.on("-f", "--filesystem filesystem", "Filesystem on the remote system.") do |fs|
+  opts.on('-f', '--filesystem filesystem', usage[:filesystem]) do |fs|
     options[:filesystem] =  fs
   end
-  opts.on("-w", "--warning warning", "Warning threshold.") do |warn|
+  opts.on('-w', '--warning warning', usage[:warning]) do |warn|
     options[:warning] =  warn
   end
-  opts.on("-c", "--critical critical", "Critical threshold.") do |crit|
+  opts.on('-c', '--critical critical', usage[:critical]) do |crit|
     options[:critical] =  crit
   end
 end.parse!
@@ -53,22 +57,23 @@ filesystem = options[:filesystem]
 warning    = options[:warning]
 critical   = options[:critical]
 
-if hostname == nil
-  puts "The hostname is a neccessary parameter."
+if hostname == nil?
+  puts 'The hostname is a neccessary parameter.'
   exit 3
-elsif username == nil
-  puts "The username is a neccessary parameter."
+elsif username == nil?
+  puts 'The username is a neccessary parameter.'
   exit 3
-elsif filesystem == nil
-  puts "The filesystem is a neccessary parameter."
+elsif filesystem == nil?
+  puts 'The filesystem is a neccessary parameter.'
   exit 3
 end
 
 # Get filesystem information of the remote host
 begin
-  fs_info = Net::SSH.start(hostname, username).exec!("stat -f -c '%s %b %f %c %d' " + filesystem).split
+  connection = Net::SSH.start(options[:hostname], options[:username])
+  fs_info = connection.exec!("stat -f -c '%s %b %f %c %d' " + filesystem).split
 rescue
-  print "DISK UNKNOWN - #{$!}\n"
+  print "DISK UNKNOWN - #{$ERROR_INFO}\n"
   exit 3
 end
 
@@ -93,7 +98,7 @@ p_max  = space_total
 i_curr = inodes_total - inodes_free
 i_warn = (inodes_total / 100) * warning.to_i
 i_crit = (inodes_total / 100) * critical.to_i
-i_min  = 0 
+i_min  = 0
 i_max  = inodes_total
 
 # Calculate used disk space and inodes
@@ -103,17 +108,17 @@ inodes_used         = inodes_total - inodes_free
 inodes_used_percent = (inodes_used.to_f / inodes_total.to_f) * 100
 
 # Calculate the exitcode
-if ((p_curr < p_warn) && (i_curr < i_warn))
-  print "DISK OK"
+if (p_curr < p_warn) && (i_curr < i_warn)
+  print 'DISK OK'
   errorcode = 0
-elsif ((p_curr >= p_warn && p_curr < p_crit) || (i_curr >= i_warn && i_curr < i_crit))
-  print "DISK WARNING"
+elsif (p_curr >= p_warn && p_curr < p_crit) || (i_curr >= i_warn && i_curr < i_crit)
+  print 'DISK WARNING'
   errorcode = 1
-elsif ((p_curr >= p_crit && p_curr <= p_max) || (i_curr >= i_crit && i_curr <= i_max))
-  print "DISK CRITICAL"
+elsif (p_curr >= p_crit && p_curr <= p_max) || (i_curr >= i_crit && i_curr <= i_max)
+  print 'DISK CRITICAL'
   errorcode = 2
 else
-  print "DISK UNKNOWN"
+  print 'DISK UNKNOWN'
   errorcode = 3
 end
 
