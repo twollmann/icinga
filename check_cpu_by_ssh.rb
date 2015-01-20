@@ -102,7 +102,7 @@ if options[:hostname] == nil? || options[:username] == nil?
 else
   # Get information about the cpu usage
   begin
-    connection = Net::SSH.start(options[:hostname], options[:username])
+    connection = Net::SSH.start(options[:hostname], options[:username], :keys => "/var/lib/nagios/.ssh/id_rsa")
     cpu_info_1 = connection.exec!("cat /proc/stat | grep -i '^cpu  '").split
     sleep(options[:period])
     cpu_info_2 = connection.exec!("cat /proc/stat | grep -i '^cpu  '").split
