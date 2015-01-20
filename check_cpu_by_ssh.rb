@@ -8,6 +8,7 @@
 # Required libraries
 require 'net/ssh'
 require 'optparse'
+require 'English'
 
 # Method to gather CPU stats
 def get_cpu_stats(hostname, username)
