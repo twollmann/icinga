@@ -3,12 +3,27 @@
 # @file         check_cpu_by_ssh.rb
 # @author       Wollmann, Tobias <t.wollmann@bull.de>
 # @date         01/20/2014
-# @version      0.4
+# @version      0.5
 
 # Required libraries
 require 'net/ssh'
 require 'optparse'
 require 'English'
+
+# Methode to open keyfile-based SSH connection
+def open_ssh_key(hostname, username, keyfile)
+  return Net::SSH.start(hostname, username, keys: keyfile)
+rescue
+  print "Failed to connect via ssh: #{$ERROR_INFO}\n"
+  exit 3
+end
+
+def open_ssh_password(hostname, username, password)
+  return Net::SSH.start(hostname, username, password: password)
+rescue
+  print "Failed to connect via ssh: #{$ERROR_INFO}\n"
+  exit 3
+end
 
 # Method to print the utilization
 def print_utilization(utilization, exitcode)
@@ -50,8 +65,10 @@ end
 
 # Declaration of command line parameters.
 options = {
-  hostname: nil,
-  username: nil,
+  hostname: '',
+  username: '',
+  keyfile:  '',
+  password: '',
   period:   5,
   mode:     0,
   warn:     90,
@@ -64,6 +81,8 @@ usage = {
   user:     'Username of the monitoring user on the remote host.',
   period:   'Time period to mesure the CPU utilization within',
   mode:     'Specifies the monitoring mode.',
+  keyfile:  'Specifie location of the pricate key for the ssh connection',
+  password: 'Specifie password for the ssh connection',
   warning:  'Specifies the warning threshold.',
   critical: 'Specifies the critical threshold.'
 }
@@ -83,6 +102,12 @@ OptionParser.new do |opts|
   opts.on('-m', '--mode mode', usage[:mode]) do |mode|
     options[:mode] =  mode.to_i
   end
+  opts.on('-k', '--keyfile keyfile', usage[:keyfile]) do |key|
+    options[:keyfile] =  key
+  end
+  opts.on('-p', '--password password', usage[:password]) do |pass|
+    options[:password] =  pass
+  end
   opts.on('-w', '--warning warning', usage[:warning]) do |warn|
     options[:warn] =  warn.to_f
   end
@@ -92,8 +117,8 @@ OptionParser.new do |opts|
 end.parse!
 
 # Verifies the given parameters
-if options[:hostname] == nil? || options[:username] == nil?
-  if options[:hostname] == nil?
+if options[:hostname] == '' || options[:username] == ''
+  if options[:hostname] == ''
     puts 'The hostname is a neccessary parameter.'
   else
     puts 'The username is a neccessary parameter.'
@@ -101,14 +126,26 @@ if options[:hostname] == nil? || options[:username] == nil?
   exit 3
 else
   # Get information about the cpu usage
-  begin
-    connection = Net::SSH.start(options[:hostname], options[:username], :keys => "/var/lib/nagios/.ssh/id_rsa")
+  if options[:password] == '' && options[:keyfile] == ''
+    puts 'You must either specifie a keyfile or a password'
+    exit 3
+  else
+    if options[:keyfile] != ''
+      connection = open_ssh_key(
+        options[:hostname],
+        options[:username],
+        options[:keyfile]
+      )
+    else
+      connection = open_ssh_password(
+        options[:hostname],
+        options[:username],
+        '1188null'
+      )
+    end
     cpu_info_1 = connection.exec!("cat /proc/stat | grep -i '^cpu  '").split
     sleep(options[:period])
     cpu_info_2 = connection.exec!("cat /proc/stat | grep -i '^cpu  '").split
-  rescue
-    print "Failed to connect via ssh: #{$ERROR_INFO}\n"
-    exit 3
   end
 
   # Calculate the CPU utilization
