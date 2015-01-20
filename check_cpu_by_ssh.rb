@@ -2,35 +2,35 @@
 #
 # @file         check_cpu_by_ssh.rb
 # @author       Wollmann, Tobias <t.wollmann@bull.de>
-# @date         01/19/2014
-# @version      0.3
+# @date         01/20/2014
+# @version      0.4
 
 # Required libraries
 require 'net/ssh'
 require 'optparse'
 require 'English'
 
-# Method to gather CPU stats
-def get_cpu_stats(hostname, username)
-  connection = Net::SSH.start(hostname, username)
-  return connection.exec!("cat /proc/stat | grep -i '^cpu  '").split
-rescue
-  print "Failed to connect via ssh: #{$ERROR_INFO}\n"
-  exit 3
-end
-
-# Method to print the performance data
-def print_perf_data(type, utilization, exitcode)
+# Method to print the utilization
+def print_utilization(utilization, exitcode)
   case exitcode
   when 0
-    print "CPU OK - #{type} utilization: #{utilization.round(2)}\n"
+    print "CPU OK - Utilization: #{utilization.round(1)};"
   when 1
-    print "CPU WARNING - #{type} utilization: #{utilization.round(2)}\n"
+    print "CPU WARNING - Utilization: #{utilization.round(1)};"
   when 2
-    print "CPU CRITICAL - #{type} utilization: #{utilization.round(2)}\n"
+    print "CPU CRITICAL - Utilization: #{utilization.round(1)};"
   when 3
     print "CPU UNKNOWN\n"
   end
+end
+
+# Method to print the performance data
+def print_perf_data(type, utilization, warning, critical)
+  print "\\| #{type} usage=#{utilization.round(1)};"
+  print "#{warning.round(1)};"
+  print "#{critical.round(1)};"
+  print '0.0;'
+  print "100.0\n"
 end
 
 # Method to generate the error code
@@ -84,10 +84,10 @@ OptionParser.new do |opts|
     options[:mode] =  mode.to_i
   end
   opts.on('-w', '--warning warning', usage[:warning]) do |warn|
-    options[:warning] =  warn
+    options[:warn] =  warn.to_f
   end
   opts.on('-c', '--critical critical', usage[:critical]) do |crit|
-    options[:critical] =  crit
+    options[:crit] =  crit.to_f
   end
 end.parse!
 
@@ -101,9 +101,15 @@ if options[:hostname] == nil? || options[:username] == nil?
   exit 3
 else
   # Get information about the cpu usage
-  cpu_info_1 = get_cpu_stats(options[:hostname], options[:username])
-  sleep(options[:period])
-  cpu_info_2 = get_cpu_stats(options[:hostname], options[:username])
+  begin
+    connection = Net::SSH.start(options[:hostname], options[:username])
+    cpu_info_1 = connection.exec!("cat /proc/stat | grep -i '^cpu  '").split
+    sleep(options[:period])
+    cpu_info_2 = connection.exec!("cat /proc/stat | grep -i '^cpu  '").split
+  rescue
+    print "Failed to connect via ssh: #{$ERROR_INFO}\n"
+    exit 3
+  end
 
   # Calculate the CPU utilization
   cpu_user   = cpu_info_2.at(1).to_i - cpu_info_1.at(1).to_i
@@ -118,22 +124,26 @@ else
     # Total CPU utilization
     perf_total = (100.to_f / cpu_time.to_f) * (cpu_user + cpu_nice + cpu_system)
     errorcode = generate_error_code(perf_total, options[:warn], options[:crit])
-    print_perf_data('Total', perf_total, errorcode)
+    print_utilization(perf_total, errorcode)
+    print_perf_data('Total', perf_total, options[:warn], options[:crit])
   when 1
     # CPU utilization of user processes
     perf_user   = (100.to_f / cpu_time.to_f) * cpu_user.to_f
     errorcode = generate_error_code(perf_user, options[:warn], options[:crit])
-    print_perf_data('User', perf_user, errorcode)
+    print_utilization(perf_user, errorcode)
+    print_perf_data('User', perf_user, options[:warn], options[:crit])
   when 2
     # CPU utilization of nice processes
     perf_nice   = (100.to_f / cpu_time.to_f) * cpu_nice.to_f
     errorcode = generate_error_code(perf_nice, options[:warn], options[:crit])
-    print_perf_data('Nice', perf_nice, errorcode)
+    print_utilization(perf_nice, errorcode)
+    print_perf_data('Nice', perf_nice, options[:warn], options[:crit])
   when 3
     # CPU utilization of system processes
     perf_system = (100.to_f / cpu_time.to_f) * cpu_system.to_f
     errorcode = generate_error_code(perf_system, options[:warn], options[:crit])
-    print_perf_data('System', perf_system, errorcode)
+    print_utilization(perf_system, errorcode)
+    print_perf_data('System', perf_system, options[:warn], options[:crit])
   end
   exit errorcode
 end
