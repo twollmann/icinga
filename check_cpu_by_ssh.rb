@@ -29,11 +29,11 @@ end
 def print_utilization(utilization, exitcode)
   case exitcode
   when 0
-    print "CPU OK - Utilization: #{utilization.round(1)}%%;"
+    print "CPU OK - Utilization: #{utilization.round(1)}%;"
   when 1
-    print "CPU WARNING - Utilization: #{utilization.round(1)}%%;"
+    print "CPU WARNING - Utilization: #{utilization.round(1)}%;"
   when 2
-    print "CPU CRITICAL - Utilization: #{utilization.round(1)}%%;"
+    print "CPU CRITICAL - Utilization: #{utilization.round(1)}%;"
   when 3
     print "CPU UNKNOWN\n"
   end
@@ -41,7 +41,7 @@ end
 
 # Method to print the performance data
 def print_perf_data(type, utilization, warning, critical)
-  print "\\| #{type} usage=#{utilization.round(1)}%%;"
+  print "\\| #{type} usage=#{utilization.round(1)}%;"
   print "#{warning.round(1)};"
   print "#{critical.round(1)};"
   print '0.0;'
