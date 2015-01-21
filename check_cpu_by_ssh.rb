@@ -140,7 +140,7 @@ else
       connection = open_ssh_password(
         options[:hostname],
         options[:username],
-        '1188null'
+        options[:password]
       )
     end
     cpu_info_1 = connection.exec!("cat /proc/stat | grep -i '^cpu  '").split
