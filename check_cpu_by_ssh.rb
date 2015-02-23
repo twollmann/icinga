@@ -2,8 +2,8 @@
 #
 # @file         check_cpu_by_ssh.rb
 # @author       Wollmann, Tobias <t.wollmann@bull.de>
-# @date         01/20/2014
-# @version      0.5
+# @date         02/23/2014
+# @version      0.6
 
 # Required libraries
 require 'net/ssh'
@@ -149,11 +149,43 @@ else
   end
 
   # Calculate the CPU utilization
-  cpu_user   = cpu_info_2.at(1).to_i - cpu_info_1.at(1).to_i
-  cpu_nice   = cpu_info_2.at(2).to_i - cpu_info_1.at(2).to_i
-  cpu_system = cpu_info_2.at(3).to_i - cpu_info_1.at(3).to_i
-  cpu_idle   = cpu_info_2.at(4).to_i - cpu_info_1.at(4).to_i
-  cpu_time   = cpu_user + cpu_nice + cpu_system + cpu_idle
+  #
+  # Based on Miscellaneous kernel statistics in /proc/stat
+  #
+  # - user: normal processes executing in user mode
+  # - nice: niced processes executing in user mode
+  # - system: processes executing in kernel mode
+  # - idle: twiddling thumbs
+  # - iowait: waiting for I/O to complete
+  # - irq: servicing interrupts
+  # - softirq: servicing softirqs
+  # - steal: involuntary wait
+  # - guest: running a normal guest
+  # - guest_nice: running a niced guest
+  #
+  # Source: https://www.kernel.org/doc/Documentation/filesystems/proc.txt
+
+  cpu_user       = cpu_info_2.at(1).to_i - cpu_info_1.at(1).to_i
+  cpu_nice       = cpu_info_2.at(2).to_i - cpu_info_1.at(2).to_i
+  cpu_system     = cpu_info_2.at(3).to_i - cpu_info_1.at(3).to_i
+  cpu_idle       = cpu_info_2.at(4).to_i - cpu_info_1.at(4).to_i
+  cpu_iowait     = cpu_info_2.at(5).to_i - cpu_info_1.at(5).to_i
+  cpu_irq        = cpu_info_2.at(6).to_i - cpu_info_1.at(6).to_i
+  cpu_softirq    = cpu_info_2.at(7).to_i - cpu_info_1.at(7).to_i
+  cpu_steal      = cpu_info_2.at(8).to_i - cpu_info_1.at(8).to_i
+  cpu_guest      = cpu_info_2.at(9).to_i - cpu_info_1.at(9).to_i
+  cpu_guest_nice = cpu_info_2.at(10).to_i - cpu_info_1.at(10).to_i
+
+  cpu_time = (cpu_user +
+              cpu_nice +
+              cpu_system +
+              cpu_idle +
+              cpu_iowait +
+              cpu_irq +
+              cpu_softirq +
+              cpu_steal +
+              cpu_guest +
+              cpu_guest_nice)
 
   # Generate performance data output regarding the selected monitoring mode.
   case options[:mode]
@@ -181,6 +213,12 @@ else
     errorcode = generate_error_code(perf_system, options[:warn], options[:crit])
     print_utilization(perf_system, errorcode)
     print_perf_data('System', perf_system, options[:warn], options[:crit])
+  when 4
+    # CPU utilization of iowait processes
+    perf_iowait = (100.to_f / cpu_time.to_f) * cpu_iowait.to_f
+    errorcode = generate_error_code(perf_iowait, options[:warn], options[:crit])
+    print_utilization(perf_iowait, errorcode)
+    print_perf_data('I/O wait', perf_iowait, options[:warn], options[:crit])
   end
   exit errorcode
 end
