@@ -6,6 +6,7 @@
 # @version      0.2
 # @param H      Hostname or ip address of the remot host.
 # @param u      Username that will be used torun the command on the remote host.
+# @param P	Optional parameter to specify the port of the remote ssh deamon.
 # @param w      Optional parameter to set the warning threshold in percentage.
 #               Default value is 90.
 # @param c      Optional parameter to set the critical threshold in percentage.
@@ -17,11 +18,11 @@ require 'optparse'
 require 'English'
 
 # Methode to open keyfile-based SSH connection
-def open_ssh_connection(hostname, username, keyfile, password)
+def open_ssh_connection(hostname, port, username, keyfile, password)
   if keyfile != ''
-    return Net::SSH.start(hostname, username, keys: keyfile)
+    return Net::SSH.start(hostname, username, port: port, keys: keyfile)
   else
-    return Net::SSH.start(hostname, username, password: password)
+    return Net::SSH.start(hostname, username, port: port, password: password)
   end
 rescue
   print "Failed to connect via ssh: #{$ERROR_INFO}\n"
@@ -72,6 +73,7 @@ options = {
   username: '',
   keyfile:  '',
   password: '',
+  port:     22,
   warn:     90,
   crit:     95
 }
@@ -80,6 +82,7 @@ options = {
 usage = {
   host:     'Hostname or ip address of the remote host.',
   user:     'Username of the monitoring user on the remote host.',
+  port:     'Specify the ssh port of the remote system.',
   keyfile:  'Specifie location of the pricate key for the ssh connection',
   password: 'Specifie password for the ssh connection',
   warning:  'Specifies the warning threshold.',
@@ -94,6 +97,9 @@ OptionParser.new do |opts|
   end
   opts.on('-u', '--user user', usage[:user]) do |user|
     options[:username] = user
+  end
+  opts.on('-P', '--port port', usage[:port]) do |port|
+    options[:port] = port
   end
   opts.on('-k', '--keyfile keyfile', usage[:keyfile]) do |key|
     options[:keyfile] =  key
@@ -125,30 +131,34 @@ else
   else
     ssh = open_ssh_connection(
       options[:hostname],
+      options[:port],
       options[:username],
       options[:keyfile],
       options[:password]
     )
   end
 
-  # Get memory information
-  memtotal = ssh.exec!("cat /proc/meminfo|grep -i '^memtotal'").split.at(1).to_i
-  memfree  = ssh.exec!("cat /proc/meminfo|grep -i '^memfree'").split.at(1).to_i
-  buffers  = ssh.exec!("cat /proc/meminfo|grep -i '^buffers'").split.at(1).to_i
-  cached   = ssh.exec!("cat /proc/meminfo|grep -i '^cached'").split.at(1).to_i
+  command  = "egrep -i '(memtotal|memfree|buffers|\^cached|slab)'"
+  command += " /proc/meminfo | awk '{ print $2 }' | sed ':a;N;$!ba;s/\\n/;/g'"
+
+  result = ssh.exec!(command)
   ssh.close
 
-  perf_curr = (memtotal - memfree - buffers - cached) / 1024
-  perf_warn = (memtotal / 100 * options[:warn]) / 1024
-  perf_crit = (memtotal / 100 * options[:crit]) / 1024
-  perf_min  = 0
-  perf_max  = memtotal / 1024
+  # Extract and convert memory information to mega bytes
+  total   = result.split(';').at(0).to_i / 1024
+  free    = result.split(';').at(1).to_i / 1024
+  buffers = result.split(';').at(2).to_i / 1024
+  cached  = result.split(';').at(3).to_i / 1024
+  slab    = result.split(';').at(4).to_i / 1024
+  used    = total - free - buffers - cached - slab
+  warn    = (total / 100 * options[:warn])
+  crit    = (total / 100 * options[:crit])
 
-  pct_free = (100.to_f / memtotal * memfree).round(1)
-  pct_used = (100.to_f - pct_free).round(1)
+  pct_used = (100.to_f / total * used).round(1)
+  pct_free = (100.to_f - pct_used.round(1))
 
   errorcode = generate_error_code(pct_used, options[:warn], options[:crit])
-  print_utilization(errorcode, perf_curr, pct_free)
-  print_perf_data(perf_curr, perf_warn, perf_crit, perf_min, perf_max)
+  print_utilization(errorcode, total - used, pct_free)
+  print_perf_data(used, warn, crit, 0, total)
   exit errorcode
 end
